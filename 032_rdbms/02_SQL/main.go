@@ -13,7 +13,7 @@ var db *sql.DB
 var err error
 
 func main() {
-	db, err = sql.Open("mysql", "admin:labyrinth@tcp(database-2.cecrltiis6kk.us-east-2.rds.amazonaws.com:3306)/?charset=utf8")
+	db, err = sql.Open("mysql", "admin:labyrinth@tcp(database-2.cecrltiis6kk.us-east-2.rds.amazonaws.com:3306)/new_schema?charset=utf8")
 	check(err)
 	defer db.Close()
 
@@ -59,14 +59,17 @@ func amigos(w http.ResponseWriter, req *http.Request) {
 func create(w http.ResponseWriter, req *http.Request) {
 
 	stmt, err := db.Prepare(`CREATE TABLE customer (name VARCHAR(20));`)
+	fmt.Println(stmt)
 	check(err)
 	defer stmt.Close()
 
 	r, err := stmt.Exec()
 	check(err)
+	fmt.Println(r)
 
 	n, err := r.RowsAffected()
 	check(err)
+	fmt.Println(n)
 
 	fmt.Fprintln(w, "CREATED TABLE customer", n)
 }
