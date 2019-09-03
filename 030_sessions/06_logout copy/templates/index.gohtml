@@ -6,11 +6,9 @@
 </head>
 <body>
 
-{{if .First}}
-USER NAME {{.UserName}}<br>
+{{if .Email}}
+USER NAME {{.Email}}<br>
 PASSWORD {{.Password}}<br>
-FIRST {{.First}}<br>
-LAST {{.Last}}<br>
 <h2><a href="/logout">log out</a></h2>
 {{else}}
 <h2><a href="/signup">sign up</a></h2>

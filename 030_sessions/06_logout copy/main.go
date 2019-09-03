@@ -1,17 +1,22 @@
 package main
 
 import (
-	"github.com/satori/go.uuid"
-	"golang.org/x/crypto/bcrypt"
+	"bufio"
+	"encoding/csv"
+	"fmt"
 	"html/template"
+	"io"
+	"log"
 	"net/http"
+	"os"
+
+	uuid "github.com/satori/go.uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type user struct {
-	UserName string
+	Email    string
 	Password []byte
-	First    string
-	Last     string
 }
 
 var tpl *template.Template
@@ -20,13 +25,26 @@ var dbSessions = map[string]string{} // session ID, user ID
 
 func init() {
 	tpl = template.Must(template.ParseGlob("templates/*"))
-	bs, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.MinCost)
-	dbUsers["test@test.com"] = user{"test@test.com", bs, "James", "Bond"}
+	populateDbUsers()
+}
+
+func populateDbUsers() {
+	f, _ := os.Open("./users")
+	defer f.Close()
+	r := csv.NewReader(bufio.NewReader(f))
+	r.Comma = ';'
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		dbUsers[record[0]] = user{record[0], []byte(record[1])}
+		fmt.Println(dbUsers)
+	}
 }
 
 func main() {
 	http.HandleFunc("/", index)
-	http.HandleFunc("/bar", bar)
 	http.HandleFunc("/signup", signup)
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/logout", logout)
@@ -39,15 +57,6 @@ func index(w http.ResponseWriter, req *http.Request) {
 	tpl.ExecuteTemplate(w, "index.gohtml", u)
 }
 
-func bar(w http.ResponseWriter, req *http.Request) {
-	u := getUser(w, req)
-	if !alreadyLoggedIn(req) {
-		http.Redirect(w, req, "/", http.StatusSeeOther)
-		return
-	}
-	tpl.ExecuteTemplate(w, "bar.gohtml", u)
-}
-
 func signup(w http.ResponseWriter, req *http.Request) {
 	if alreadyLoggedIn(req) {
 		http.Redirect(w, req, "/", http.StatusSeeOther)
@@ -57,12 +66,11 @@ func signup(w http.ResponseWriter, req *http.Request) {
 	// process form submission
 	if req.Method == http.MethodPost {
 		// get form values
-		un := req.FormValue("username")
+		em := req.FormValue("email")
 		p := req.FormValue("password")
-		f := req.FormValue("firstname")
-		l := req.FormValue("lastname")
+
 		// username taken?
-		if _, ok := dbUsers[un]; ok {
+		if _, ok := dbUsers[em]; ok {
 			http.Error(w, "Username already taken", http.StatusForbidden)
 			return
 		}
@@ -73,15 +81,26 @@ func signup(w http.ResponseWriter, req *http.Request) {
 			Value: sID.String(),
 		}
 		http.SetCookie(w, c)
-		dbSessions[c.Value] = un
+		dbSessions[c.Value] = em
 		// store user in dbUsers
 		bs, err := bcrypt.GenerateFromPassword([]byte(p), bcrypt.MinCost)
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		u = user{un, bs, f, l}
-		dbUsers[un] = u
+		u = user{em, bs}
+		dbUsers[em] = u
+		csv := append([]byte(u.Email), []byte(";")...)
+		csv = append(csv, u.Password...)
+		csv = append(csv, []byte(";\n")...)
+		// , u.Password..., []byte(";\n")...)
+
+		f, err := os.OpenFile("./users", os.O_APPEND|os.O_WRONLY, 0600)
+		check(err)
+		defer f.Close()
+		_, err = f.Write(csv)
+		check(err)
+
 		// redirect
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
@@ -97,10 +116,10 @@ func login(w http.ResponseWriter, req *http.Request) {
 	var u user
 	// process form submission
 	if req.Method == http.MethodPost {
-		un := req.FormValue("username")
+		em := req.FormValue("email")
 		p := req.FormValue("password")
 		// is there a username?
-		u, ok := dbUsers[un]
+		u, ok := dbUsers[em]
 		if !ok {
 			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
 			return
@@ -118,7 +137,7 @@ func login(w http.ResponseWriter, req *http.Request) {
 			Value: sID.String(),
 		}
 		http.SetCookie(w, c)
-		dbSessions[c.Value] = un
+		dbSessions[c.Value] = em
 		http.Redirect(w, req, "/", http.StatusSeeOther)
 		return
 	}
@@ -143,4 +162,10 @@ func logout(w http.ResponseWriter, req *http.Request) {
 	http.SetCookie(w, c)
 
 	http.Redirect(w, req, "/login", http.StatusSeeOther)
+}
+
+func check(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }
