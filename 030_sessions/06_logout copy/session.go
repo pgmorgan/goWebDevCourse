@@ -31,7 +31,7 @@ func alreadyLoggedIn(req *http.Request) bool {
 	if err != nil {
 		return false
 	}
-	un := dbSessions[c.Value]
-	_, ok := dbUsers[un]
+	em := dbSessions[c.Value]
+	_, ok := dbUsers[em]
 	return ok
 }

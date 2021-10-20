@@ -53,8 +53,7 @@ func main() {
 }
 
 func index(w http.ResponseWriter, req *http.Request) {
-	u := getUser(w, req)
-	tpl.ExecuteTemplate(w, "index.gohtml", u)
+	tpl.ExecuteTemplate(w, "index.gohtml", nil)
 }
 
 func signup(w http.ResponseWriter, req *http.Request) {
@@ -90,10 +89,9 @@ func signup(w http.ResponseWriter, req *http.Request) {
 		}
 		u = user{em, bs}
 		dbUsers[em] = u
-		csv := append([]byte(u.Email), []byte(";")...)
+		csv := append([]byte(u.Email), ';')
 		csv = append(csv, u.Password...)
-		csv = append(csv, []byte(";\n")...)
-		// , u.Password..., []byte(";\n")...)
+		csv = append(csv, '\n')
 
 		f, err := os.OpenFile("./users", os.O_APPEND|os.O_WRONLY, 0600)
 		check(err)
@@ -118,10 +116,9 @@ func login(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		em := req.FormValue("email")
 		p := req.FormValue("password")
-		// is there a username?
 		u, ok := dbUsers[em]
 		if !ok {
-			http.Error(w, "Username and/or password do not match", http.StatusForbidden)
+			http.Error(w, "<h2>Username and/or password do not match</h2>", http.StatusForbidden)
 			return
 		}
 		// does the entered password match the stored password?
